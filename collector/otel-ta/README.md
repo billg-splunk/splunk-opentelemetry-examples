@@ -80,7 +80,7 @@ You are looking for a line like this:
 
 Then refresh "Forwarder Management". It may take a few more seconds to appear.
 
-![[forwarder_management_initial.png]]
+![Intial Forwarder Screen](img/forwarder_management_initial.png)
 
 ### Deploy OTel Collector with base config
 
@@ -110,18 +110,18 @@ sudo chown -R 41812:41812 Splunk_TA_otel
 ```
 
 You can confirm the TA has been deployed to splunk on the apps tab:
-![[forwarder_management_apps.png]]
+![Forwarder Management - Apps](img/forwarder_management_apps.png)
 
 Next, edit the app and make sure after installation `Enable App` and `Restart Splunkd` are checked.
 
-![[forwarder_management_app_restart_splunk.png]]
+![Forwarder Management - Restart Splunk](img/forwarder_management_app_restart_splunk.png)
 
 Now we have the configuration set, we need to tell Splunk which collectors to send it to. Switch to the `Server Classes` tab and create a new server class named `otel_base_linux`. Make the following settings:
 * For apps, include `Splunk_TA_otel`
 * For clients, include `uf*`
 
 The result should look like the following:
-![[forwared_management_server_class_base.png]]
+![Forwarder Management - Server Class Defined](img/forwared_management_server_class_base.png)
 
 If all goes well you will get collectors in Splunk Observability. If you are running hosts locally you will find them under `Infrastructure >  My Data Center > Hosts`. If they are in the cloud then they will be under the appropriate cloud tile:
 * `AWS EC2`
@@ -130,7 +130,7 @@ If all goes well you will get collectors in Splunk Observability. If you are run
 * etc.
 
 For example:
-![[img/o11y_cloud_base.png]]
+![Result in O11y Cloud](img/o11y_cloud_base.png)
 
 ### Deploy configurations for Apache and Tomcat
 TBD
