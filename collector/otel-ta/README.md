@@ -6,21 +6,26 @@ This example is meant for someone with minimal Splunk knowledge.
 
 It will assume a setup needing three configurations:
 * A Splunk OTel Collector collecting only the operating system
-* A Splunk OTel Collector collecting the operating system and Apache
-* A Splunk OTel Collector collecting the operating system and Tomcat
+* A Splunk OTel Collector collecting the operating system and apache
+* A Splunk OTel Collector collecting the operating system and nginx
 
-If you need a configurating that includes multiple apps, the current recommendation is to have a configuration with both in one (vs. sending the base, apache, and tomcat), for reasons that will become obvious once you see how this configuration is set up.
+If you need a configurating that includes multiple apps, the current recommendation is to have a configuration with both in one (vs. sending the base, apache, and nginx), for reasons that will become obvious once you see how this configuration is set up.
 
 ## Outline
 
 The following represents the set of steps needed to achieve this:
-* Install Splunk
-* Install UF on 3 endpoints
-* Setup Deployment Server
-  * Deploy OTel Collector with base config
-  * Test the base configuration
-  * Deploy configurations for apache and nginx
-  * Test the configurations for all 3 servers
+- [OTel TA](#otel-ta)
+  - [Outline](#outline)
+  - [Installs](#installs)
+    - [Install Splunk](#install-splunk)
+    - [Install UF on 3 endpoints](#install-uf-on-3-endpoints)
+  - [Deploy OTel Collector with base config](#deploy-otel-collector-with-base-config)
+    - [Test the base configuration](#test-the-base-configuration)
+  - [Deploy configurations for apache and nginx](#deploy-configurations-for-apache-and-nginx)
+    - [Test the configurations for all 3 servers](#test-the-configurations-for-all-3-servers)
+  - [Tips and Tricks](#tips-and-tricks)
+
+## Installs
 
 ### Install Splunk
 For this example we will simply use docker to run our server. NOTE this document is not reflecting best practices for deploying Splunk. For example we are deploying without a proper cert, and we are using simple passwords that should not be used in production.
@@ -81,7 +86,7 @@ Then refresh "Forwarder Management". It may take a few more seconds to appear.
 
 ![Intial Forwarder Screen](img/forwarder_management_initial.png)
 
-### Deploy OTel Collector with base config
+## Deploy OTel Collector with base config
 
 Next we need to add the contents that we want to push to all of the systems. We will start by simply downloading the TA and making the minimal changes needed to start collecting metrics to send to Splunk Observability Cloud.
 
@@ -132,13 +137,13 @@ If all goes well you will get collectors in Splunk Observability. If you are run
 For example:
 ![Result in O11y Cloud](img/o11y_cloud_base.png)
 
-### Deploy configurations for apache and nginx
+## Deploy configurations for apache and nginx
 
 Next we want to look at configuring configuration deployments for various apps.
 
-Each configuration needs to stand on its own. For example if a system has apache and tomcat you would need a configuration containing both receivers. But it can be separated from the install files.
+Each configuration needs to stand on its own. For example if a system has apache and nginx you would need a configuration containing both receivers. But it can be separated from the install files.
 
-For our example we will create one configuration for apache and one for tomcat, and push them to uf2 and uf3 (respectively).
+For our example we will create one configuration for apache and one for nginx, and push them to uf2 and uf3 (respectively).
 
 To set this up let's configure the following folder structure under `/etc/deployment-apps`, using the files from [here](configuration-files):
 ```
@@ -151,9 +156,9 @@ To set this up let's configure the following folder structure under `/etc/deploy
         otel-apache.yaml
       /local        
         inputs.conf
-    /Splunk_TA_app_config_tomcat
+    /Splunk_TA_app_config_nginx
       /configs
-        otel-tomcat.yaml
+        otel-nginx.yaml
       /local        
         inputs.conf
 ```
@@ -185,8 +190,8 @@ location /status {
 }
 ```
 
-and finally test the configuration with `nginx -t`. Then you will either need to start or restart nginx (try both):
-* `nginx`
+and finally test the configuration with `nginx -t`. Then you will either need to start or restart nginx:
+* To start: `nginx`
 * If you get errors that the address is already in use: `nginx -s reload`
 
 And you can test the status with:
