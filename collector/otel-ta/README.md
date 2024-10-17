@@ -2,10 +2,10 @@
 
 The OTel TA is a way for customers who already use the Splunk Universal Forwarder (UF) with the Deployment Server to distribute the Open Telemetry Collector and config files.
 
-This example is meant for someone with minimal Splunk knowledge.
+This example is meant for someone with minimal Splunk knowledge but has some background on configuring the open telemetry collector. It will walk through configuring the deployment server and installing and configuring the open telemetry collector. It also assumes light docker knowledge, although the steps for use are documented.
 
-It will assume a setup needing three configurations:
-* A Splunk OTel Collector collecting only the operating system
+For the example we need three configurations:
+* A Splunk OTel Collector collecting only the operating system (default config)
 * A Splunk OTel Collector collecting the operating system and apache
 * A Splunk OTel Collector collecting the operating system and nginx
 
@@ -17,6 +17,7 @@ The following represents the set of steps needed to achieve this:
 - [OTel TA](#otel-ta)
   - [Outline](#outline)
   - [Installs](#installs)
+    - [Install docker](#install-docker)
     - [Install Splunk](#install-splunk)
     - [Install UF on 3 endpoints](#install-uf-on-3-endpoints)
   - [Deploy OTel Collector with base config](#deploy-otel-collector-with-base-config)
@@ -27,8 +28,11 @@ The following represents the set of steps needed to achieve this:
 
 ## Installs
 
+### Install docker
+Follow [the instructions](https://docs.docker.com/engine/install/) to install docker. These instructions were tested on a linux host, and may need to be amended slightly for a different os or architecture.
+
 ### Install Splunk
-For this example we will simply use docker to run our server. NOTE this document is not reflecting best practices for deploying Splunk. For example we are deploying without a proper cert, and we are using simple passwords that should not be used in production.
+For this example we will simply use docker to run our server. NOTE this document is not reflecting best practices for deploying Splunk. The install doesn't deploy a certificate, and we are using simple passwords that should not be used in production, among other shortcuts.
 
 After installing docker (and docker compose), create a docker compose file (`compose.yaml`):
 ```
@@ -51,7 +55,11 @@ services:
 networks: {}
 ```
 
-You will need to create the folder `/splunk` on your system; you can substitute this for another folder, just replace the first part of the volume lines with the folder you use.
+What is notable about this configuration:
+* We expose port 8000 (web ui), 8089 (management endpoint) and 9997 (deployment server endpoint)
+* We are mapping `/etc` (where the apps are deployed) and `/var` (where logs are accessed) to simplify management and preserve them when the container is restarted
+
+In order to use this configuration you will need to create the folder `/splunk` on your host system; you can substitute this for another folder, just replace the first part of the volume lines with the folder you use.
 
 Then launch it from the same directory the `compose.yaml` is in with:
 ```
@@ -59,9 +67,9 @@ docker compose up -d
 ```
 
 ### Install UF on 3 endpoints
-We'll use 3 linux boxes for the purposes of this setup.
+We'll use 3 linux (ubuntu) systems for the purposes of this setup. Note the ip address of your host, as you will need it for this section. Our example uses `192.168.7.240`.
 
-On each box run the following commands. You can update the version of the UF, and change the IP address to use the one your Splunk server is running on:
+On each box run the following commands. You can update the version of the UF, and change the IP address as noted above:
 ```
 sudo useradd -m splunkfwd
 sudo groupadd splunkfwd
@@ -163,7 +171,9 @@ To set this up let's configure the following folder structure under `/etc/deploy
         inputs.conf
 ```
 
-For this example we are only setting a new config file (i.e. `otel-apache.yaml`) in our `inputs.conf` file, but we could also make other changes (like pointing to a separate `access_token` file).
+Let's talk about the naming of the folders (apps). The deployment server uses [lexographical order](https://lantern.splunk.com/Splunk_Success_Framework/Data_Management/Naming_conventions). In addition the `local` directory supercedes the `default` directory. So by putting updates in the `/local/inputs.conf` file we are overriding the default configuration that is coming with the base install. 
+
+For this example we are only setting a new config file (i.e. `otel-apache.yaml`) in our `inputs.conf` file, but we could also make other changes (like pointing to a separate `access_token` file) and anything else we want to override.
 
 Let's first deploy these two apps.
 
@@ -182,7 +192,7 @@ sudo apt install nginx
 sudo vi /etc/nginx/sites-available/default
 ```
 
-and then add the following to `server` block, after the 2 listen statements:
+and then add the following to `server` block, after the 2 listen statements, to add a status page the `nginx` receiver will collect from:
 ``` conf
 location /status {
   stub_status;
@@ -190,7 +200,7 @@ location /status {
 }
 ```
 
-and finally test the configuration with `nginx -t`. Then you will either need to start or restart nginx:
+Finally we can test the nginx configuration with `nginx -t`. Then you will either need to start or restart nginx:
 * To start: `nginx`
 * If you get errors that the address is already in use: `nginx -s reload`
 
@@ -200,7 +210,7 @@ curl http://localhost/status
 ```
 ### Test the configurations for all 3 servers
 
-Then we can remap the clients:
+Now that our `uf2` and `uf3` are running `apache` and `nginx`, respectively, we can remap the clients to send the new configurations:
 * uf1 - base
 * uf2 - base and apache
 * uf3 - base and nginx
