@@ -18,10 +18,9 @@ The following represents the set of steps needed to achieve this:
 * Install UF on 3 endpoints
 * Setup Deployment Server
   * Deploy OTel Collector with base config
-  * Deploy configurations for Apache and Tomcat
-* Test Deployments
-  * Configure all endpoints to use base config
-  * Configure UF2 (Apache) and UF3 (Tomcat)
+  * Test the base configuration
+  * Deploy configurations for apache and nginx
+  * Test the configurations for all 3 servers
 
 ### Install Splunk
 For this example we will simply use docker to run our server. NOTE this document is not reflecting best practices for deploying Splunk. For example we are deploying without a proper cert, and we are using simple passwords that should not be used in production.
@@ -112,13 +111,14 @@ sudo chown -R 41812:41812 Splunk_TA_otel
 You can confirm the TA has been deployed to splunk on the apps tab:
 ![Forwarder Management - Apps](img/forwarder_management_apps.png)
 
-Next, edit the app and make sure after installation `Enable App` and `Restart Splunkd` are checked.
+### Test the base configuration
 
-![Forwarder Management - Restart Splunk](img/forwarder_management_app_restart_splunk.png)
+Now we have the configuration set, we need to tell Splunk which collectors to send it to, as well as restart after running.
 
-Now we have the configuration set, we need to tell Splunk which collectors to send it to. Switch to the `Server Classes` tab and create a new server class named `otel_base_linux`. Make the following settings:
+First, switch to the `Server Classes` tab and create a new server class named `otel_base_linux`. Make the following settings:
 * For apps, include `Splunk_TA_otel`
-* For clients, include `uf*`
+* Make sure the app will restart splunkd. (You will need to edit the app now to do that)
+* Finally set the clients, include `uf*`
 
 The result should look like the following:
 ![Forwarder Management - Server Class Defined](img/forwared_management_server_class_base.png)
@@ -132,9 +132,88 @@ If all goes well you will get collectors in Splunk Observability. If you are run
 For example:
 ![Result in O11y Cloud](img/o11y_cloud_base.png)
 
-### Deploy configurations for Apache and Tomcat
-TBD
+### Deploy configurations for apache and nginx
+
+Next we want to look at configuring configuration deployments for various apps.
+
+Each configuration needs to stand on its own. For example if a system has apache and tomcat you would need a configuration containing both receivers. But it can be separated from the install files.
+
+For our example we will create one configuration for apache and one for tomcat, and push them to uf2 and uf3 (respectively).
+
+To set this up let's configure the following folder structure under `/etc/deployment-apps`, using the files from [here](configuration-files):
+```
+/etc
+  /deployment-apps
+    /Splunk_TA_otel
+      <install files and default configuration>
+    /Splunk_TA_app_config_apache
+      /configs
+        otel-apache.yaml
+      /local        
+        inputs.conf
+    /Splunk_TA_app_config_tomcat
+      /configs
+        otel-tomcat.yaml
+      /local        
+        inputs.conf
+```
+
+For this example we are only setting a new config file (i.e. `otel-apache.yaml`) in our `inputs.conf` file, but we could also make other changes (like pointing to a separate `access_token` file).
+
+Let's first deploy these two apps.
+
+On uf2, deploy apache:
+
+```
+sudo apt update
+sudo apt install apache2
+```
+
+On uf3, deploy nginx:
+
+```
+sudo apt update
+sudo apt install nginx
+sudo vi /etc/nginx/sites-available/default
+```
+
+and then add the following to `server` block, after the 2 listen statements:
+``` conf
+location /status {
+  stub_status;
+  allow all;
+}
+```
+
+and finally test the configuration with `nginx -t`. Then you will either need to start or restart nginx (try both):
+* `nginx`
+* If you get errors that the address is already in use: `nginx -s reload`
+
+And you can test the status with:
+```
+curl http://localhost/status
+```
+### Test the configurations for all 3 servers
+
+Then we can remap the clients:
+* uf1 - base
+* uf2 - base and apache
+* uf3 - base and nginx
+
+It should look like this:
+![Final Forwarder Management](img/forwarder_management_final.png)
+
+And in Splunk Observability you will find metrics for apache and nginx, such as:
+* apache: `apache.traffic`, `apache.uptime`, `apache.requests`, etc.
+* nginx: ``
 
 ## Tips and Tricks
-* If you aren't sure what is going on you can always uninstall the app and then redeploy it to the server class(es)
+* In our example we simply deployed the otel base, which included both linux and windows files. These could be separated into apps relevant for each operating system.
 * Make sure the app includes restarting splunkd
+* If you aren't sure what is going on you have a few options
+  * On the Splunk Server you can run `/opt/splunk/bin/splunk reload deployment-server` to redeploy
+    * You can run this with the option `-class [serverclass name]` to do this for just a specific server class
+  * Alternatively you can uninstall the app and then set it up again
+* The following logs are useful to monitor
+  * `/opt/splunk/var/log/splunk/Splunk_TA_otel.log`: For the lifecycle of the TA and OTel Collector
+  * `/opt/splunk/var/log/splunk/otel.log`: For the otel collector itself
